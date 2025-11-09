@@ -1,6 +1,8 @@
 const dropZone = document.getElementById('drop_zone');
 const fileInput = document.getElementById('fileInput');
-const downloadLink = document.getElementById('downloadLink');
+const selectButton = document.getElementById('selectButton');
+const processButton = document.getElementById('processButton');
+const fileStatus = document.getElementById('fileStatus');
 const outputAudio = document.getElementById('outputAudio');
 const ko2Form = document.getElementById('ko2Form');
 const ko2FormToggle = document.getElementById('ko2FormToggle');
@@ -8,13 +10,34 @@ const ko2FormFieldset = document.getElementById('ko2FormFieldset');
 const rangeInputs = document.querySelectorAll('input[type="range"]');
 const rootnoteInput = document.getElementById('sound.rootnote');
 const rootnootOutput = document.querySelector(`output[for="sound.rootnote"]`);
+const manualBpmInput = document.getElementById('manualBpm');
 let fileName;
+let selectedFiles = [];
 
 const NOTE_MAP = {};
 const NOTES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 for (let i = 0; i < 12; i++) {
     NOTE_MAP[i] = `N${i + 1}`;
+}
+
+function ensureWavExtension(name) {
+    if (!name) {
+        return 'processed.wav';
+    }
+
+    const dotIndex = name.lastIndexOf('.');
+    if (dotIndex === -1) {
+        return `${name}.wav`;
+    }
+
+    const base = name.slice(0, dotIndex);
+    const ext = name.slice(dotIndex + 1);
+    if (ext.toLowerCase() === 'wav') {
+        return name;
+    }
+
+    return `${base}.wav`;
 }
 for (let i = 12; i < 128; i++) {
     const note = NOTES[(i - 12) % NOTES.length];
@@ -23,11 +46,25 @@ for (let i = 12; i < 128; i++) {
 }
 
 // Event listeners
-dropZone.addEventListener('click', () => fileInput.click());
-dropZone.addEventListener('dragover', handleDragOver);
-dropZone.addEventListener('dragleave', handleDragLeave);
-dropZone.addEventListener('drop', handleFileDrop);
+if (dropZone) {
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('drop', handleFileDrop);
+}
+
 fileInput.addEventListener('change', handleFileSelect);
+
+if (selectButton) {
+    selectButton.addEventListener('click', () => fileInput.click());
+}
+
+if (processButton) {
+    processButton.addEventListener('click', () => processSelectedFiles());
+}
+
+updateProcessingControls();
+updateFileStatus('No files selected.');
 ko2FormToggle.addEventListener('change', handleKO2FormState);
 rangeInputs.forEach(input => input.addEventListener('input', handleRangeOutput));
 rangeInputs.forEach(input => handleRangeOutput({ currentTarget: input }))
@@ -65,14 +102,56 @@ function handleFileDrop(event) {
     dropZone.classList.remove('dragover');
     const files = event.dataTransfer.files;
     if (files.length > 0) {
-        processFiles(files);
+        prepareSelectedFiles(files);
     }
 }
 
 function handleFileSelect(event) {
     const files = event.target.files;
     if (files.length > 0) {
-        processFiles(files);
+        prepareSelectedFiles(files);
+    }
+    event.target.value = '';
+}
+
+
+function prepareSelectedFiles(files) {
+    selectedFiles = Array.from(files);
+
+    if (!selectedFiles.length) {
+        updateFileStatus('No files selected.');
+        updateProcessingControls();
+        return;
+    }
+
+    const summary = formatSelectedFilesSummary(selectedFiles);
+    updateFileStatus(`Selected ${summary}`);
+    updateProcessingControls();
+}
+
+function formatSelectedFilesSummary(files) {
+    if (files.length === 1) {
+        return files[0].name;
+    }
+
+    const maxList = 3;
+    const names = files.slice(0, maxList).map(file => file.name);
+    const remaining = files.length - names.length;
+    return remaining > 0 ? `${files.length} files (${names.join(', ')}${remaining > 0 ? `, +${remaining} more` : ''})` : `${files.length} files (${names.join(', ')})`;
+}
+
+function updateProcessingControls(isProcessing = false) {
+    if (processButton) {
+        processButton.disabled = isProcessing || selectedFiles.length === 0;
+    }
+    if (selectButton) {
+        selectButton.disabled = isProcessing;
+    }
+}
+
+function updateFileStatus(message) {
+    if (fileStatus) {
+        fileStatus.textContent = message;
     }
 }
 
@@ -88,6 +167,8 @@ function getSampleRate(fidelity) {
             return 26000;
         case 'SP-1201':
             return 26000;
+        case 'EP-40':
+            return 22000;
         case 'SK-1':
             return 9000;
         default:
@@ -100,6 +181,8 @@ function getBitDepth(fidelity) {
         case 'SP-1200':
             return 8;
         case 'SP-1201':
+            return 16;
+        case 'EP-40':
             return 16;
         case 'SK-1':
             return 8;
@@ -131,8 +214,15 @@ function getKO2Buffer() {
     const settingsStringified = JSON.stringify(settings);
     const ko2Settings = settingsStringified !== "{}" ? settingsStringified : ``;
     const textEncoder = new TextEncoder();
+    let encoded = textEncoder.encode(ko2Settings);
 
-    return textEncoder.encode(ko2Settings);
+    if (encoded.length) {
+        const withNullTerminator = new Uint8Array(encoded.length + 1);
+        withNullTerminator.set(encoded, 0);
+        encoded = withNullTerminator;
+    }
+
+    return encoded;
 }
 
 function extractBpmAndKey(fileName) {
@@ -152,31 +242,43 @@ function extractBpmAndKey(fileName) {
     };
 }
 
-async function processFiles(files) {
-    if (files.length === 1) {
-        const processedFile = await processAudio(files[0]);
-        downloadFile(processedFile.blob, processedFile.name);
-    } else {
-        const zip = new JSZip();
-        for (let i = 0; i < files.length; i++) {
-            const processedFile = await processAudio(files[i]);
-            zip.file(processedFile.name, processedFile.blob);
+async function processSelectedFiles() {
+    if (!selectedFiles.length) {
+        alert('Please select audio files before processing.');
+        return;
+    }
+
+    updateProcessingControls(true);
+    updateFileStatus('Processing...');
+
+    try {
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const processedFile = await processAudio(selectedFiles[i]);
+            downloadFile(processedFile.blob, processedFile.name);
+
+            if (selectedFiles.length === 1) {
+                updateFileStatus(`Processed: ${processedFile.name}`);
+            } else {
+                updateFileStatus(`Processed ${i + 1}/${selectedFiles.length} files...`);
+            }
         }
-        zip.generateAsync({ type: "blob" }).then(function (content) {
-            saveAs(content, "processed_files.zip");
-        });
+
+        if (selectedFiles.length > 1) {
+            updateFileStatus(`Processed ${selectedFiles.length} files (downloaded individually).`);
+        }
+    } catch (error) {
+        console.error(error);
+        const message = error && error.message ? error.message : 'An unexpected error occurred while processing.';
+        updateFileStatus(message);
+        alert(message);
+        return;
+    } finally {
+        updateProcessingControls(false);
     }
 }
 
 function downloadFile(blob, fileName) {
-    const url = URL.createObjectURL(blob);
-    const downloadLink = document.createElement('a');
-    downloadLink.href = url;
-    downloadLink.download = fileName;
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-    URL.revokeObjectURL(url);
+    saveAs(blob, fileName);
 }
 
 async function processAudio(file) {
@@ -214,6 +316,25 @@ async function processAudio(file) {
                 const { bpm, key } = extractBpmAndKey(fileName);
                 console.log(`Extracted BPM: ${bpm}, Key: ${key}`);
 
+                const renameSelection = getSelectedRadioValue("filename") === "true";
+                let manualBpm = null;
+                if (renameSelection) {
+                    manualBpm = getManualBpmValue();
+                }
+                const resolvedBpm = manualBpm !== null ? manualBpm : bpm;
+                const resolvedKey = key || 'Unknown';
+                let outputName = file.name;
+
+                if (renameSelection) {
+                    const bpmLabel = resolvedBpm !== 'Unknown' ? resolvedBpm : 'Unknown';
+                    const keyLabel = resolvedKey !== 'Unknown' ? resolvedKey : 'Unknown';
+                    outputName = sanitizeFileName(`${bpmLabel} ${keyLabel}.wav`);
+                } else {
+                    outputName = sanitizeFileName(outputName);
+                }
+
+                outputName = ensureWavExtension(outputName);
+
                 const channelData = [];
                 let x = speedVal;
                 const length = Math.floor(buffer.length / x);
@@ -243,9 +364,9 @@ async function processAudio(file) {
 
                 const resampledBuffer = resampleBuffer(newBuffer, buffer.sampleRate, sRateVal);
                 const modifiedBuffer = quantizeBuffer(resampledBuffer, bitVal, audioContext);
-                const audioBlob = await encodeResampledAudio(modifiedBuffer, bpm, key, bitVal, fileName, ko2Buffer);
+                const audioBlob = await encodeResampledAudio(modifiedBuffer, bitVal, ko2Buffer);
 
-                resolve({ blob: audioBlob, name: fileName });
+                resolve({ blob: audioBlob, name: outputName });
             } catch (error) {
                 reject(error);
             }
@@ -253,6 +374,41 @@ async function processAudio(file) {
 
         reader.readAsArrayBuffer(file);
     });
+}
+
+function getManualBpmValue() {
+    if (!manualBpmInput) {
+        return null;
+    }
+
+    const value = manualBpmInput.value.trim();
+    if (value === '') {
+        return null;
+    }
+
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) {
+        throw new Error('Manual BPM must be a whole number.');
+    }
+
+    if (parsed < 40 || parsed > 300) {
+        throw new Error('Manual BPM must be between 40 and 300.');
+    }
+
+    return parsed;
+}
+
+function sanitizeFileName(name) {
+    const sanitized = name
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (!sanitized) {
+        return 'processed.wav';
+    }
+
+    return sanitized.toLowerCase().endsWith('.wav') ? sanitized : `${sanitized}.wav`;
 }
 
 function resampleBuffer(buffer, sampleRate, newSampleRate) {
@@ -267,9 +423,13 @@ function resampleBuffer(buffer, sampleRate, newSampleRate) {
         for (let i = 0; i < newLength; i++) {
             const ratio = i * sampleRate / newSampleRate;
             const index = Math.floor(ratio);
+            const nextIndex = Math.min(index + 1, inputData.length - 1);
             const frac = ratio - index;
 
-            outputData[i] = inputData[index] * (1 - frac) + inputData[index + 1] * frac;
+            const currentSample = inputData[Math.min(index, inputData.length - 1)];
+            const nextSample = inputData[nextIndex];
+
+            outputData[i] = currentSample * (1 - frac) + nextSample * frac;
         }
     }
 
@@ -293,15 +453,10 @@ function quantizeBuffer(buffer, bitDepth, audioContext) {
     return newBuffer;
 }
 
-async function encodeResampledAudio(buffer, bpm, key, bitDepth, fileName, ko2Buffer) {
+async function encodeResampledAudio(buffer, bitDepth, ko2Buffer) {
     const numberOfChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
     const samples = buffer.length;
-    let newFileName = fileName;
-    let checkIfRename = getSelectedRadioValue("filename");
-    if (checkIfRename === "true") {
-        newFileName = `${bpm} ${key}.wav`;
-    }
 
     const wavBuffer = audioBufferToWav(buffer, bitDepth, ko2Buffer);
     const blob = new Blob([wavBuffer], { type: 'audio/wav' });

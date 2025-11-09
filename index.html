@@ -3,31 +3,49 @@
 
 <head>
   <link rel="icon" type="image/png" href="images/icon.png">
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Re:Pitch</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#fff">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Re:Pitch:RIDDIM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0b0b0d">
 </head>
 
 <body>
     <div class="content">
-    <h1>Re:Pitch</h1>
+    <h1>Re:Pitch:RIDDIM</h1>
     <div class="divcont">
-    <div id="drop_zone" class="drop-zone">
-        <p>Choose options then drop an audio file here or click to select a file</p>
-        <input type="file" id="fileInput" accept="audio/*" multiple style="display: none;">
+      <div class="drop-area">
+        <div id="drop_zone" class="drop-zone">
+          <div>
+          <p>1 - Select or drop your audio files here</p>
+          <p>2 - Adjust options below</p>
+          <p>3 - Process and Download your files</p>
+          <p>4 - Use EP Tool to put the files onto your EP sampler</p>
+        </div>
+          <input type="file" id="fileInput" accept="audio/*" multiple style="display: none;">
+        </div>
+        <div class="control-actions">
+          <p id="fileStatus" class="file-status">No files selected.</p>
+          <div class="button-row">
+            <button class="primary" id="processButton" disabled>Process &amp; Download</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <button style="display: none;" id="processButton">Resample Audio</button>
-    <a id="downloadLink" style="display: none;">Download </a>
-    </div>
-    <div class="information items">
+    <div class="information items panel options-row">
       <div class="fidelity">
         <p><b>Fidelity</b></p>
-      <div>
-          <input type="radio" id="sd" name="fidelity" value="sd" checked />
+        <div>
+          <input type="radio" id="sd" name="fidelity" value="sd" />
           <label for="sd">CD (16/46)</label>
+        </div>
+        <div>
+          <input type="radio" id="EP-40" name="fidelity" value="EP-40" checked />
+          <label for="EP-40">EP-40 (16/22)</label>
         </div>
 
         <div>
@@ -61,11 +79,11 @@
       <div class="channels">
         <p><b>Channels</b></p>
         <div>
-          <input type="radio" id="2" name="channels" value="2" checked/>
+          <input type="radio" id="2" name="channels" value="2"/>
           <label for="2">Stereo</label>
         </div>
         <div>
-          <input type="radio" id="1" name="channels" value="1"/>
+          <input type="radio" id="1" name="channels" value="1" checked/>
           <label for="1">Mono</label>
         </div>
 
@@ -73,23 +91,28 @@
       <div class="filename">
         <p><b>Rename File?</b></p>
         <div>
-          <input type="radio" id="1" name="filename" value="true" checked/>
+          <input type="radio" id="1" name="filename" value="true"/>
           <label for="1">Rename to BPM and Key</label>
         </div>
         <div>
-          <input type="radio" id="2" name="filename" value="false"/>
+          <input type="radio" id="2" name="filename" value="false" checked/>
           <label for="2">Keep Original Filename</label>
+        </div>
+        <div class="manual-bpm">
+          <label for="manualBpm"><b>Manual BPM (optional)</b></label>
+          <input type="number" name="manualBpm" id="manualBpm" min="40" max="300" placeholder="e.g. 120">
+          <p class="input-hint">Used when renaming files; overrides detected BPM.</p>
         </div>
       </div>
     </div>
     <form id="ko2Form">
-      <details class="information" open>
+      <details class="information panel" open>
         <summary>
-          <b>EP-133 KO II Settings</b>
+          <b>EP-40 Settings</b>
           <input type="checkbox" role="switch" id="ko2FormToggle" checked style="margin-left: 2em;">
         </summary>
 
-        <fieldset id="ko2FormFieldset" class="items">
+        <fieldset id="ko2FormFieldset" class="items options-row">
           <p class="volume-slider">
             <output class="price-output" for="sound.amplitude"></output>
             <input type="range" orient="vertical" name="sound.amplitude" id="sound.amplitude" value="100" min="0" max="200" list="amplitudelist" />
@@ -145,16 +168,20 @@
           <div>
             <p><b>Playmode</b></p>
             <div>
-              <input type="radio" id="sound.playmode.oneshot" name="sound.playmode" value="oneshot" checked />
+              <input type="radio" id="sound.playmode.oneshot" name="sound.playmode" value="oneshot" />
               <label for="sound.playmode.oneshot">Oneshot</label>
             </div>
             <div>
               <input type="radio" id="sound.playmode.key" name="sound.playmode" value="key" />
               <label for="sound.playmode.key">Key</label>
             </div>
-            <div style="margin-bottom: 1.8em">
+            <div>
               <input type="radio" id="sound.playmode.legato" name="sound.playmode" value="legato" />
               <label for="sound.playmode.legato">Legato</label>
+            </div>
+            <div style="margin-bottom: 1.8em">
+              <input type="radio" id="sound.playmode.loop" name="sound.playmode" value="loop" checked />
+              <label for="sound.playmode.loop">Loop (Only EP-40)</label>
             </div>
 
             <div>
@@ -167,11 +194,11 @@
           <div>
             <p><b>Time Stretch</b></p>
             <div>
-              <input type="radio" id="time.mode.off" name="time.mode" value="off" checked/>
+              <input type="radio" id="time.mode.off" name="time.mode" value="off" />
               <label for="time.mode.off">Off</label>
             </div>
             <div>
-              <input type="radio" id="time.mode.bpm" name="time.mode" value="bpm" />
+              <input type="radio" id="time.mode.bpm" name="time.mode" value="bpm" checked/>
               <label for="time.mode.bpm">BPM</label>
             </div>
             <div>
@@ -181,53 +208,13 @@
           </div>
         </fieldset>
 
-        <p><i>These options set the default playback style when the sample loads in the Teenage Engineering KO II. They are ignored in other samplers.</i></p>
+        <p><i>The <b>"Playmode"</b> and <b>"Time Stretch"</b> options set the respective settings only on Teenage Engineering EP devices. They are ignored in other samplers. Loop mode is only supported on EP-40 RIDDIM.</i></p>
       </details>
     </form>
-
-    <div class="information">
-      <div class="section 1">
-          <h2>What Is This?</h2>
-          <p>A tool that modifies the speed and fidelity of audio files.</p>
-      </div>
-  
-      <div class="section 2">
-          <h2>How Do I Use This?</h2>
-          <p>1. Choose options <br>
-            2. Upload files (max. 30 sec.)<br>
-            3. ??? <br>
-            4. Make music <br>
-          </p>
-      </div>
-      <div class="section">
-          <h2>What Do The Options Mean?</h2>
-          <p>Fidelity sets, well, the fidelity of the output. You can choose between CD Quality (46kHz 16 Bit) and approximations of old samplers such as the Emu SP-1200 (26kHz 12 Bit)* or Casio SK-1 (9kHz 8 Bit). Speed sets the speed of the output and Channels sets the output channels. <br><br>*Due to lack of 12 Bit support in WAV files there are two options for the SP-1200 simulation.</p>
-      </div>
-  
-      <div class="section 3">
-          <h2>Why Does This Exist?</h2>
-          <p>Speeding up audio samples is an old trick dating back to the first hardware samplers such as the <a href="https://en.wikipedia.org/wiki/E-mu_SP-1200">Emu SP-1200</a> and <a href="https://de.wikipedia.org/wiki/Akai_MPC_60">Akai MPC 60</a>. It was used to get around memory limitations. These days, it's useful for the <a href="https://www.roland.com/global/products/sp-404mk2/">Roland SP-404</a> or the <a href="https://teenage.engineering/products/ep-133">Teenage Engineering EP-133 KO II.</a> Now you're asking yourself, "Can't I do this with my DAW?" Sure, you could, but this is a drag & drop solution, and no one forces you to use it anyway.</p>
-      </div>
-      <div class="section">
-          <h2>How Does This Work?</h2>
-          <p>It only uses the WebAudio API and some fairy dust. Files are processed client-side, which means that your audio does not get sent to any servers. If you want to know more, the source code is on <a href="https://github.com/YYUUGGOO/repitch">GitHub</a>.</p>
-      </div>
-      <div class="section 5">
-          <h2>What Do I Do With The Files?</h2>
-          <p>Upload them to your sampler and pitch down accordingly. <br><br>If you are using the KO II, assign the sample to a pad and either pitch it down or play it chromatically one octave down if you chose 2X and two octaves down if you chose 4X.</p>
-      </div>
-      <div class="section 4">
-          <h2>Why Did You Make This?</h2>
-          <p>Because I got tired of manually speeding up and resampling samples for my KO II using Ableton.</p>
-      </div>
-      <div class="section">
-          <h2>Who Are You?</h2>
-          <p>My name is David, but I go by Palm and Yūgo. I'm an indie artist mainly doing lo-fi but also other kinds of music. If you want to know more, you can check out my website at <a href="https://yuugo.xyz">yuugo.xyz</a></p>
-      </div>
-  </div>
   
     <div class="footer">
-        <p>Made by <a href="https://yuugo.xyz">Yūgo</a> with massive help from <a href="https://brianholt.ca/">Brian Holt</a> <br> Darkmode by <a href="https://darkmodejs.learn.uno/">Darkroom.js</a></p>
+        <p>Original Applications Made by <a href="https://yuugo.xyz">Yūgo</a> with massive help from <a href="https://brianholt.ca/">Brian Holt</a> <br> Darkmode by <a href="https://darkmodejs.learn.uno/">Darkroom.js</a></p>
+        <p>Riddim Modifications and Fork by <a href="https://github.com/geleeroyale/repitch-riddim">geleeroyale</a></p>
     </div>
 </body>
 
