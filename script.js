@@ -251,20 +251,37 @@ async function processSelectedFiles() {
     updateProcessingControls(true);
     updateFileStatus('Processing...');
 
-    try {
-        for (let i = 0; i < selectedFiles.length; i++) {
-            const processedFile = await processAudio(selectedFiles[i]);
-            downloadFile(processedFile.blob, processedFile.name);
+    const downloadMode = getSelectedRadioValue('download.mode') || 'auto';
+    const shouldZip = downloadMode === 'zip' || (downloadMode === 'auto' && selectedFiles.length > 1);
 
-            if (selectedFiles.length === 1) {
-                updateFileStatus(`Processed: ${processedFile.name}`);
-            } else {
+    try {
+        if (shouldZip) {
+            const zip = new JSZip();
+            for (let i = 0; i < selectedFiles.length; i++) {
+                updateFileStatus(`Processing ${i + 1}/${selectedFiles.length} files...`);
+                const processedFile = await processAudio(selectedFiles[i]);
+                zip.file(processedFile.name, processedFile.blob);
                 updateFileStatus(`Processed ${i + 1}/${selectedFiles.length} files...`);
             }
-        }
+            updateFileStatus('Preparing ZIP...');
+            const content = await zip.generateAsync({ type: 'blob' });
+            downloadFile(content, selectedFiles.length > 1 ? 'processed_files.zip' : 'processed_file.zip');
+            updateFileStatus(`Processed ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} (downloaded as ZIP).`);
+        } else {
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const processedFile = await processAudio(selectedFiles[i]);
+                downloadFile(processedFile.blob, processedFile.name);
 
-        if (selectedFiles.length > 1) {
-            updateFileStatus(`Processed ${selectedFiles.length} files (downloaded individually).`);
+                if (selectedFiles.length === 1) {
+                    updateFileStatus(`Processed: ${processedFile.name}`);
+                } else {
+                    updateFileStatus(`Processed ${i + 1}/${selectedFiles.length} files...`);
+                }
+            }
+
+            if (selectedFiles.length > 1) {
+                updateFileStatus(`Processed ${selectedFiles.length} files (downloaded individually).`);
+            }
         }
     } catch (error) {
         console.error(error);
@@ -466,8 +483,10 @@ async function encodeResampledAudio(buffer, bitDepth, ko2Buffer) {
 function audioBufferToWav(buffer, bitDepth, ko2Buffer) {
     const ko2BufferSize = ko2Buffer.length;
     const ko2BufferPadding = ko2BufferSize % 2;
-    const smplSize = ko2BufferSize !== 0 ? 36 : 0; // 36 is the size when using KO-2 tool
-    const listSize = ko2BufferSize !== 0 ? 12 : 0; // size of LIST, INFO, and TNGE headers
+    const smplSize = 0;
+    const listHeaderSize = ko2BufferSize !== 0 ? 12 : 0; // size for LIST chunk header and INFO type
+    const infoChunkHeaderSize = ko2BufferSize !== 0 ? 8 : 0; // TNGE header + size
+    const listSize = listHeaderSize + infoChunkHeaderSize;
 
     const numOfChannels = buffer.numberOfChannels;
     const dataSize = buffer.length * numOfChannels * (bitDepth / 8)
@@ -494,18 +513,9 @@ function audioBufferToWav(buffer, bitDepth, ko2Buffer) {
     setUint16(bitDepth); // bit depth
 
     if (ko2BufferSize > 0) {
-        // smpl subchunk
-        setUint32(0x6C706D73); // "smpl"
-        setUint32(smplSize);
-        // Fill with padding
-        for (let i = 0; i < smplSize; i++) {
-            view.setUint8(pos, 0x00);
-            pos++;
-        }
-
         // LIST subchunk
         setUint32(0x5453494C); // "LIST"
-        setUint32(listSize + ko2BufferSize + ko2BufferPadding);
+        setUint32(listSize + ko2BufferSize + ko2BufferPadding - 8); // exclude LIST header itself
         // INFO subchunk
         setUint32(0x4F464E49); // INFO
         setUint32(0x45474E54); // TNGE

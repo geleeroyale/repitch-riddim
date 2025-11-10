@@ -24,7 +24,6 @@
           <p>1 - Select or drop your audio files here</p>
           <p>2 - Adjust options below</p>
           <p>3 - Process and Download your files</p>
-          <p>4 - Use EP Tool to put the files onto your EP sampler</p>
         </div>
           <input type="file" id="fileInput" accept="audio/*" multiple style="display: none;">
         </div>
@@ -33,6 +32,20 @@
           <div class="button-row">
             <button class="primary" id="processButton" disabled>Process &amp; Download</button>
           </div>
+          <div class="download-options">
+        <div>
+          <input type="radio" id="download.auto" name="download.mode" value="auto" checked />
+          <label for="download.auto">Auto (zip when handling multiple files)</label>
+        </div>
+        <div>
+          <input type="radio" id="download.zip" name="download.mode" value="zip" />
+          <label for="download.zip">Always zip downloads</label>
+        </div>
+        <div>
+          <input type="radio" id="download.individual" name="download.mode" value="individual" />
+          <label for="download.individual">Always download individually</label>
+        </div>
+      </div>
         </div>
       </div>
     </div>
@@ -209,12 +222,13 @@
         </fieldset>
 
         <p><i>The <b>"Playmode"</b> and <b>"Time Stretch"</b> options set the respective settings only on Teenage Engineering EP devices. They are ignored in other samplers. Loop mode is only supported on EP-40 RIDDIM.</i></p>
+                  <p>Use <a href="https://teenage.engineering/apps/ep-sample-tool" target="_blank">EP Tool</a> to put the files onto your EP sampler</p>
       </details>
     </form>
   
     <div class="footer">
         <p>Original Applications Made by <a href="https://yuugo.xyz">Yūgo</a> with massive help from <a href="https://brianholt.ca/">Brian Holt</a> <br> Darkmode by <a href="https://darkmodejs.learn.uno/">Darkroom.js</a></p>
-        <p>Riddim Modifications and Fork by <a href="https://github.com/geleeroyale/repitch-riddim">geleeroyale</a></p>
+        <p>Riddim Modifications and Fork by <a href="https://github.com/geleeroyale/repitch-riddimok - lka">geleeroyale</a></p>
     </div>
 </body>
 
